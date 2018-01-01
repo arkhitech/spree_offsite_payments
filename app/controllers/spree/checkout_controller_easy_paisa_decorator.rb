@@ -8,7 +8,6 @@ module Spree
     
     private
     def easy_paisa_checkout_hook
-      @caller="web"
       #support step confirmation 
       return unless ( @order.next_step_complete? && is_easy_paisa? )
       @payment = @order.payments.processing.find_or_create_by(amount: @order.outstanding_balance, payment_method: @payment_method)

@@ -6,19 +6,19 @@ module Spree
     before_action :load_processor, except: :status_update
     skip_before_action :verify_authenticity_token, only: [:notification, :return]
 
-    rescue_from Spree::OffsitePayments::InvalidRequestError,
-                 Spree::OffsitePayments::UnVerifiableNotifyError,
-                 Spree::OffsitePayments::InvalidOutTradeNoError,
-                 Spree::OffsitePayments::PaymentNotFoundError do |error|
+    rescue_from OffsitePayments::InvalidRequestError,
+                 OffsitePayments::UnVerifiableNotifyError,
+                 OffsitePayments::InvalidOutTradeNoError,
+                 OffsitePayments::PaymentNotFoundError do |error|
       logger.warn(error.message)
       redirect_to spree.root_path
     end
 
-    def return
+    def return 
       @result = @processor.process
       #logger.debug("session contains: #{session.inspect}")
-      @order=@processor.order
-      @payment=Spree::Payment.find_by_id(params[:identifier]) if params[:identifier]
+      @order = @processor.order
+      @payment = Payment.find_by_id(params[:identifier]) if params[:identifier]
       @order||= @payment.order if @payment
       logger.debug("received result of #{@result.to_s} for payment #{@payment.id} of order #{@order.number}")
      
@@ -26,15 +26,16 @@ module Spree
       when :payment_processed_already
         # if it's less than a minute ago, maybe it's processed by the "notification"
         flash[:notice] = "Payment Processed Already" if ((Time.now - @processor.payment.updated_at) > 1.minute)
-        redirect_to spree.order_path(@order) if params[:caller]!="mobile"
+        redirect_to_with_fallback(spree.order_path(@order))
       when :order_completed
         flash[:notice] = "Order Completed"
         #session[:order_id] = nil
-        redirect_to spree.order_path(@order) if params[:caller]!="mobile"
+        
+        redirect_to_with_fallback(spree.order_path(@order))
       when :payment_success_but_order_incomplete
         flash[:warn] = "Payment success but order incomplete"
         #redirect_to edit_order_checkout_url(@order, state: "payment")
-        redirect_to shop_checkout_state_url(shop_id: @order.shop.id, state: "payment") if params[:caller]!="mobile"
+        redirect_to_with_fallback(shop_checkout_state_url(shop_id: @order.shop.id, state: "payment"))
       when :payment_failure
         unless @processor.response.errors.blank?
           flash[:error] = @processor.response.errors.join("<br/>").html_safe
@@ -42,12 +43,24 @@ module Spree
           flash[:error] = "Payment failed"
         end
         #redirect_to edit_order_checkout_url(@order, state: "payment")
-         redirect_to shop_checkout_state_url(shop_id: @order.shop.id, state: "payment") if params[:caller]!="mobile"
+        redirect_to_with_fallback(shop_checkout_state_url(shop_id: @order.shop.id, state: "payment"))
       else
-         redirect_to spree.order_path(@order) if params[:caller]!="mobile"
+        redirect_to_with_fallback spree.order_path(@order)
       end
     end
 
+    def redirect_to_with_fallback(order_path)
+      if params[:caller] != 'mobile'        
+        if params[:caller].present?
+          redirect_url_caller = URI.unescape(@return_caller)
+          redirect_to redirect_url_caller
+        else
+          redirect_to order_path
+        end
+      end
+    end
+    private :redirect_to_with_fallback
+    
     def notification
       result = @processor.process
       logger.debug("content_type::::::#{request.content_type}")
@@ -99,13 +112,16 @@ module Spree
     private
 
     def load_processor
+      if request.params[:caller].present?
+        @return_caller = URI.unescape(request.params[:caller])
+      end
       if request.params[:method] == 'easy_paisa' && request.params[:auth_token]
-        @payment=Spree::Payment.find_by_id(request.params[:identifier])
-        @auth_code=request.params[:auth_token]
-        @caller=request.params[:caller]
+        @payment = Payment.find_by_id(request.params[:identifier])
+        @auth_code = request.params[:auth_token]
+        @caller = request.params[:caller]
         render :easy_paisa_confirm
       else
-        @processor = Spree::OffsitePayments.load_for(request)
+        @processor = OffsitePayments.load_for(request)
         @processor.log = logger
       end
     end

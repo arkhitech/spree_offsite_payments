@@ -22,7 +22,7 @@ module Spree
     #/shops/chain-mart/checkout/offsite?payment_method=ubl #&order=ordernumber
     def offsite
       @payment_method = PaymentMethod.find(params[:payment_method])
-      @caller="mobile"
+      @caller = 'mobile'
       unless @order.next_step_complete?
         render nothing: true
       end
