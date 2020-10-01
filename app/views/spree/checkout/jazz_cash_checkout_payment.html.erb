@@ -3,7 +3,7 @@
 	current_time_plus_1 = Time.now + 1.day
 	transaction_time = current_time.strftime("%Y%m%d%H%M%S")
 	transaction_exp_time = current_time_plus_1.strftime("%Y%m%d%H%M%S")
-	
+
 	@salt = ENV['salt']
 	@hashString = ''
 	@hashString+= ENV['salt'] + '&'
@@ -27,7 +27,7 @@
 	@hashString+= '4&'
 	@hashString+= '5'
 	@pp_SecureHash = OpenSSL::HMAC.hexdigest('SHA256', @salt, @hashString)
-	
+
 	payment_service_for @payment.id, "#{@payment.order.number}",
 											pp_Version: ENV['pp_Version'],
 											pp_TxnType: ENV['pp_TxnType'],
